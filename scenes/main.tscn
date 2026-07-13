@@ -264,3 +264,124 @@ grow_vertical = 2
 theme_override_colors/font_color = Color(0.7, 0.85, 0.7, 1)
 theme_override_font_sizes/font_size = 14
 horizontal_alignment = 1
+
+[node name="VictoryPanel" type="Panel" parent="HUDLayer/HUD" unique_id=423762379]
+visible = false
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="TitleLabel" type="Label" parent="HUDLayer/HUD/VictoryPanel" unique_id=1422250315]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -160.0
+offset_top = -260.0
+offset_right = 160.0
+offset_bottom = -215.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
+theme_override_font_sizes/font_size = 32
+text = "YOU ESCAPED THE DUNGEON!"
+horizontal_alignment = 1
+
+[node name="ScoreNamesLabel" type="Label" parent="HUDLayer/HUD/VictoryPanel" unique_id=1935495510]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -160.0
+offset_top = -200.0
+offset_right = 30.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "Total Score"
+
+[node name="ScoreValuesLabel" type="Label" parent="HUDLayer/HUD/VictoryPanel" unique_id=466154213]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = 34.0
+offset_top = -200.0
+offset_right = 160.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "0"
+horizontal_alignment = 2
+
+[node name="RestartButton" type="Button" parent="HUDLayer/HUD/VictoryPanel" unique_id=1934883873]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -71.0
+offset_top = 40.0
+offset_right = 69.0
+offset_bottom = 80.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Restart"
+
+[node name="ShareButton" type="Button" parent="HUDLayer/HUD/VictoryPanel" unique_id=807103882]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -151.0
+offset_top = 90.0
+offset_right = -11.0
+offset_bottom = 130.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Share"
+
+[node name="DownloadButton" type="Button" parent="HUDLayer/HUD/VictoryPanel" unique_id=345757321]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = 9.0
+offset_top = 90.0
+offset_right = 149.0
+offset_bottom = 130.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Download"
+
+[node name="ScreenshotStatusLabel" type="Label" parent="HUDLayer/HUD/VictoryPanel" unique_id=1190080080]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -198.0
+offset_top = 140.0
+offset_right = 196.0
+offset_bottom = 166.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.7, 0.85, 0.7, 1)
+theme_override_font_sizes/font_size = 14
+horizontal_alignment = 1

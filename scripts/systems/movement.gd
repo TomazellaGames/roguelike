@@ -36,7 +36,9 @@ static func try_move(entity: Entity, dir: Vector2i, map: DungeonMap, entities: A
 	return msg
 
 static func _trigger_trap(entity: Entity) -> String:
-	var dmg: int = max(1, floori(entity.max_hp / 2))
+	if entity.is_player:
+		entity.traps_triggered += 1
+	var dmg: int = max(1, floori(entity.max_hp / 2.0))
 	entity.hp -= dmg
 	var name := "You" if entity.is_player else entity.display_name.capitalize()
 	var verb := "step" if entity.is_player else "steps"

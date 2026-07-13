@@ -19,6 +19,13 @@ const DOOR_MIN_LEVEL := 11
 const HIDDEN_TRAP_MIN_LEVEL := 11
 const HIDDEN_TRAP_REVEAL_DISTANCE := 2
 
+const GOAL_LEVEL := 21
+const HP_SCORE_MAX := 1000
+const GOLD_SCORE_PER_UNIT := 10
+const TRAP_SCORE_PER_TRIGGER := 250
+const BOOST_POTION_SCORE_PENALTY := -200
+const GEAR_SCORE_PENALTY := -20
+
 const WHEEL_OUTCOMES := [
 	{"chance": 1, "id": "die"},
 	{"chance": 1, "id": "lose_upgrade"},
@@ -45,6 +52,7 @@ var item_pickups: Array = []
 var stairs_pos: Vector2i
 var turn_manager: TurnManager
 var game_over := false
+var game_won := false
 var level := 1
 var max_level_reached := 1
 var _key_press_time: Dictionary = {}
@@ -53,6 +61,10 @@ var _blink_end_msec: int = -1
 var doors_open := false
 var switch_pos: Vector2i = Vector2i(-1, -1)
 var hidden_trap_pos: Vector2i = Vector2i(-1, -1)
+
+var stats_gold_collected := 0
+var stats_gear_collected := 0
+var stats_boost_potions_collected := 0
 
 func _ready() -> void:
 	hud.move_pressed.connect(_on_hud_move_pressed)
@@ -84,9 +96,13 @@ func _process(_delta: float) -> void:
 func new_game() -> void:
 	randomize()
 	game_over = false
+	game_won = false
 	level = 1
 	if max_level_reached < 1:
 		max_level_reached = 1
+	stats_gold_collected = 0
+	stats_gear_collected = 0
+	stats_boost_potions_collected = 0
 	hud.reset()
 	player = Entity.new_player(Vector2i.ZERO)
 	_start_level()
@@ -333,6 +349,34 @@ func _on_player_died() -> void:
 	hud.add_message("You have died.")
 	hud.show_game_over(max_level_reached)
 
+func _win_game() -> void:
+	game_over = true
+	game_won = true
+	hud.add_message("You escaped the dungeon alive at floor %d!" % GOAL_LEVEL)
+	hud.show_victory(_compute_score())
+
+## Tallies the run into a score: remaining HP and collected gold count for you,
+## triggered traps count for you (the risk paid off), and collected pickups
+## count against you (a "flawless, unequipped" run scores highest) — potions
+## the most, weapons/armor a little, wheel spins and doors not at all.
+func _compute_score() -> Dictionary:
+	var hp_score: int = int(round((1.0 - float(player.hp) / float(player.max_hp)) * HP_SCORE_MAX))
+	var gold_score: int = stats_gold_collected * GOLD_SCORE_PER_UNIT
+	var traps_score: int = player.traps_triggered * TRAP_SCORE_PER_TRIGGER
+	var potion_score: int = stats_boost_potions_collected * BOOST_POTION_SCORE_PENALTY
+	var gear_score: int = stats_gear_collected * GEAR_SCORE_PENALTY
+	var total: int = hp_score + gold_score + traps_score + potion_score + gear_score
+	return {
+		"total": total,
+		"lines": [
+			["Remaining HP", hp_score],
+			["Gold", gold_score],
+			["Traps", traps_score],
+			["Boost Potion", potion_score],
+			["Gear", gear_score],
+		],
+	}
+
 func _on_toll_failed(fee: int) -> void:
 	game_over = true
 	hud.add_message("You cannot pay the %d gold toll. Your journey ends here." % fee)
@@ -343,12 +387,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ENTER:
 			new_game()
 		return
+
 	if not (event is InputEventKey):
 		return
-	
+
 	# TODO remove this on builds
 	# Debug cheat codes: Shift/Ctrl/Alt + a key grants gear, gold, or heals for testing.
-	_debug_codes(event)
+	#_debug_codes(event)
 		
 	var dir := _keycode_to_direction(event.keycode)
 	if dir == Vector2i.ZERO:
@@ -410,7 +455,13 @@ func _consume_hold(key) -> bool:
 	return held_msec >= HOLD_THRESHOLD_MSEC
 
 func _perform_move(dir: Vector2i, double_step: bool) -> void:
+	var gold_before := player.gold
 	turn_manager.process_player_turn(dir, double_step)
+	# Any gold gained this turn came from killing monsters in combat (the only
+	# other change, toll payment, happens separately in _check_stairs).
+	var gold_gained := player.gold - gold_before
+	if gold_gained > 0:
+		stats_gold_collected += gold_gained
 	if not game_over:
 		_check_item_pickup()
 	if not game_over:
@@ -428,9 +479,11 @@ func _check_item_pickup() -> void:
 			continue
 		if pickup.slot == "weapon":
 			player.equip_weapon(pickup.item_def)
+			stats_gear_collected += 1
 			hud.add_message("You wield a %s." % pickup.item_def["name"])
 		elif pickup.slot == "armor":
 			player.equip_armor(pickup.item_def)
+			stats_gear_collected += 1
 			hud.add_message("You wear %s." % pickup.item_def["name"])
 		elif pickup.slot == "wheel":
 			_spin_wheel_of_fortune()
@@ -445,6 +498,7 @@ func _check_item_pickup() -> void:
 ## can use to signal a bigger milestone.
 func _get_heal_item() -> bool:
 	player.heal_items_consumed += 1
+	stats_boost_potions_collected += 1
 	player.max_hp += 3
 	player.base_atk += 1
 	player.base_defense += 1
@@ -526,6 +580,7 @@ func _wheel_gear_upgrade() -> String:
 	var chainmail: Dictionary = ItemDefs.ARMOR[1].duplicate()
 	chainmail["def_bonus"] += level_bonus
 	player.equip_armor(chainmail)
+	stats_gear_collected += 2
 	return "You are gifted a Spear and Chainmail!"
 
 func _room_containing(pos: Vector2i) -> Rect2i:
@@ -571,6 +626,7 @@ func _wheel_kill_random_monster() -> String:
 	var gold := randi_range(target.gold_min, target.gold_max)
 	target.hp = 0
 	player.gold += gold
+	stats_gold_collected += gold
 	return "A %s dies in a burst of light! You gain %d gold." % [target.display_name, gold]
 
 func _wheel_kill_room_monsters() -> String:
@@ -585,14 +641,21 @@ func _wheel_kill_room_monsters() -> String:
 	if count == 0:
 		return "...but there are no monsters in this room."
 	player.gold += total_gold
+	stats_gold_collected += total_gold
 	return "Every monster in the room is annihilated! You gain %d gold." % total_gold
 
 func _check_stairs() -> void:
 	if dungeon_map.get_tile(player.grid_pos) != Tile.Type.STAIRS_DOWN:
 		return
+	var next_level := level + 1
+	if next_level == GOAL_LEVEL:
+		level = next_level
+		if level > max_level_reached:
+			max_level_reached = level
+		_win_game()
+		return
 	# Every TOLL_INTERVAL levels, the player must pay a gold toll to descend
 	# further; failing to pay ends the run.
-	var next_level := level + 1
 	if next_level % TOLL_INTERVAL == 0:
 		var fee := _toll_fee()
 		if player.gold < fee:
@@ -698,4 +761,3 @@ func _debug_codes(event: InputEvent) -> void:
 			hud.update_gold(player.gold)
 			hud.add_message("DEBUG: You used a cheat code!")
 			_render()
-			

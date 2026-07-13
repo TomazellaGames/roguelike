@@ -35,6 +35,8 @@ var move_steps: int = 1
 var phases_walls: bool = false
 var dodge_chance: float = 0.0
 
+var traps_triggered: int = 0
+
 static func new_player(pos: Vector2i) -> Entity:
 	var e := Entity.new()
 	e.grid_pos = pos

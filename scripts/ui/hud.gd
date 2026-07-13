@@ -27,6 +27,14 @@ signal download_pressed
 @onready var download_button: Button = $GameOverPanel/DownloadButton
 @onready var screenshot_status_label: Label = $GameOverPanel/ScreenshotStatusLabel
 
+@onready var victory_panel: Panel = $VictoryPanel
+@onready var victory_names_label: Label = $VictoryPanel/ScoreNamesLabel
+@onready var victory_values_label: Label = $VictoryPanel/ScoreValuesLabel
+@onready var victory_restart_button: Button = $VictoryPanel/RestartButton
+@onready var victory_share_button: Button = $VictoryPanel/ShareButton
+@onready var victory_download_button: Button = $VictoryPanel/DownloadButton
+@onready var victory_screenshot_status_label: Label = $VictoryPanel/ScreenshotStatusLabel
+
 func _ready() -> void:
 	_bind_move_button(up_button, Vector2i(0, -1))
 	_bind_move_button(down_button, Vector2i(0, 1))
@@ -35,6 +43,9 @@ func _ready() -> void:
 	restart_button.pressed.connect(func(): restart_pressed.emit())
 	share_button.pressed.connect(func(): share_pressed.emit())
 	download_button.pressed.connect(func(): download_pressed.emit())
+	victory_restart_button.pressed.connect(func(): restart_pressed.emit())
+	victory_share_button.pressed.connect(func(): share_pressed.emit())
+	victory_download_button.pressed.connect(func(): download_pressed.emit())
 
 func _bind_move_button(button: Button, dir: Vector2i) -> void:
 	button.button_down.connect(func(): move_pressed.emit(dir))
@@ -68,10 +79,28 @@ func show_game_over(max_level: int) -> void:
 	screenshot_status_label.text = ""
 	game_over_panel.visible = true
 
+## score is a Dictionary shaped like {"total": int, "lines": [[label, value], ...]}
+## (see main.gd's _compute_score). Names and values are rendered as two
+## separate labels (left/right-aligned, one line per row) so the columns line
+## up cleanly regardless of font metrics, instead of relying on tab stops.
+func show_victory(score: Dictionary) -> void:
+	var names: PackedStringArray = ["Total Score", ""]
+	var values: PackedStringArray = [str(score["total"]), ""]
+	for entry in score["lines"]:
+		names.append(entry[0])
+		values.append(str(entry[1]))
+	victory_names_label.text = "\n".join(names)
+	victory_values_label.text = "\n".join(values)
+	victory_screenshot_status_label.text = ""
+	victory_panel.visible = true
+
 func show_screenshot_status(text: String) -> void:
 	screenshot_status_label.text = text
+	victory_screenshot_status_label.text = text
 
 func reset() -> void:
 	game_over_panel.visible = false
+	victory_panel.visible = false
 	screenshot_status_label.text = ""
+	victory_screenshot_status_label.text = ""
 	message_log.clear()
