@@ -60,7 +60,7 @@ const GHOST := {
 	"sight_radius": 4,
 	"gold_min": 0,
 	"gold_max": 0,
-	"min_level": 14,
+	"min_level": 15,
 	"trap_immune": true,
 	"phases_walls": true,
 	"move_steps": 2,

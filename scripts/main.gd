@@ -126,8 +126,9 @@ func _spawn_monsters() -> void:
 	var atk_bonus := floori((level - 1) / 3.0)
 	var spider_spawned := false
 	var ogre_spawned := false
+	var ghost_spawned := false
 	for i in range(1, rooms.size()):
-		var def := _pick_monster_def(spider_spawned, ogre_spawned)
+		var def := _pick_monster_def(spider_spawned, ogre_spawned, ghost_spawned)
 		var m := Entity.new_monster(rooms[i].get_center(), def)
 		if def["name"] != "ghost":
 			m.hp += hp_bonus
@@ -140,9 +141,11 @@ func _spawn_monsters() -> void:
 				spider_spawned = true
 			"ogre":
 				ogre_spawned = true
+			"ghost":
+				ghost_spawned = true
 		entities.append(m)
 
-func _pick_monster_def(spider_spawned: bool, ogre_spawned: bool) -> Dictionary:
+func _pick_monster_def(spider_spawned: bool, ogre_spawned: bool, ghost_spawned: bool = false) -> Dictionary:
 	var candidates: Array = []
 	for def in MonsterDefs.ALL:
 		if level < def.get("min_level", 1):
@@ -150,6 +153,8 @@ func _pick_monster_def(spider_spawned: bool, ogre_spawned: bool) -> Dictionary:
 		if def["name"] == "spider" and spider_spawned:
 			continue
 		if def["name"] == "ogre" and ogre_spawned:
+			continue
+		if def["name"] == "ghost" and ghost_spawned:
 			continue
 		candidates.append(def)
 	return candidates[randi() % candidates.size()]
@@ -250,6 +255,31 @@ func _place_doors_and_switch() -> void:
 	candidate_rooms.shuffle()
 	switch_pos = _random_trap_position(candidate_rooms[0])
 	dungeon_map.set_tile(switch_pos, Tile.Type.SWITCH)
+	# Safety net: doors are only meant to seal off the stairs room, but if a
+	# corridor happens to graze it and gets sealed too, the switch room could
+	# become unreachable. Rather than risk locking the player out, just leave
+	# the doors open for the floor in that case.
+	if not _is_reachable(rooms[0].get_center(), switch_pos):
+		doors_open = true
+		dungeon_map.open_doors()
+
+## Flood-fills from `from` over walkable tiles (doors block, like walls) to check
+## whether `to` can be reached without the switch having been triggered yet.
+func _is_reachable(from: Vector2i, to: Vector2i) -> bool:
+	var dirs: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
+	var visited := {from: true}
+	var queue: Array = [from]
+	while not queue.is_empty():
+		var current: Vector2i = queue.pop_front()
+		if current == to:
+			return true
+		for dir in dirs:
+			var next: Vector2i = current + dir
+			if visited.has(next) or not dungeon_map.is_walkable(next):
+				continue
+			visited[next] = true
+			queue.append(next)
+	return false
 
 ## From HIDDEN_TRAP_MIN_LEVEL on, hides exactly one extra trap per floor that
 ## only becomes visible once the player gets close to it.
@@ -271,6 +301,7 @@ func _check_switch() -> void:
 		return
 	doors_open = true
 	dungeon_map.open_doors()
+	dungeon_map.set_tile(switch_pos, Tile.Type.FLOOR)
 	hud.add_message("You trigger the switch. Somewhere on this floor, doors grind open.")
 
 ## Reveals the hidden trap (turning it into a normal, visible TRAP tile) once the
@@ -517,7 +548,7 @@ func _has_monster_named(monster_name: String) -> bool:
 	return false
 
 func _wheel_spawn_monster(room: Rect2i) -> String:
-	var def := _pick_monster_def(_has_monster_named("spider"), _has_monster_named("ogre"))
+	var def := _pick_monster_def(_has_monster_named("spider"), _has_monster_named("ogre"), _has_monster_named("ghost"))
 	var m := Entity.new_monster(room.get_center(), def)
 	if def["name"] != "ghost":
 		m.hp += level - 1
@@ -639,13 +670,19 @@ func _debug_codes(event: InputEvent) -> void:
 				printerr("DEBUG: adding one Upgrade")
 				has_changes = true
 			elif event.keycode == KEY_1:
-				player.gold += 5
-				printerr("DEBUG: adding 5 gold")
+				player.gold += 10
+				printerr("DEBUG: adding 10 gold")
 				has_changes = true
 			elif event.keycode == KEY_APOSTROPHE:
 				player.hp = player.max_hp
 				printerr("DEBUG: Full Heal")
 				has_changes = true
+			elif event.keycode == KEY_3:
+				printerr("DEBUG: Skip Floor")
+				level = level + 1
+				hud.add_message("DEBUG: You used a cheat code!")
+				hud.add_message("You descend to floor %d." % level)
+				_start_level()
 		if has_changes:
 			var level_bonus := floori((level - 1) / 2.0)
 			if weapon_added:

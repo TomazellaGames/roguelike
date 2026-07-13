@@ -38,16 +38,17 @@ static func _take_half_speed_turn(monster: Entity, player: Entity, map: DungeonM
 		return ""
 	return Movement.try_move(monster, dir, map, entities)
 
-## Monsters with move_steps > 1 (e.g. Ghost) advance up to that many tiles toward
-## the player in a single turn instead of attacking-or-moving-once. They still
-## use their whole turn to attack if already adjacent, and stop advancing early
-## if a step becomes eventful (attack/trap) or brings them adjacent to the player.
+## Monsters with move_steps > 1 (e.g. Ghost) spend their turn advancing toward
+## the player one tile at a time, up to move_steps tiles, but attack as soon as
+## they become adjacent instead of continuing to move — so a monster with
+## move_steps 2 either walks 2 tiles, or walks 1 tile and then hits the player
+## if that step brought it into range.
 static func _take_multi_step_turn(monster: Entity, player: Entity, map: DungeonMap, entities: Array) -> String:
-	if _is_orthogonal_adjacent(monster.grid_pos, player.grid_pos):
-		return Combat.resolve_attack(monster, player)
-
 	var msgs: Array = []
 	for i in range(monster.move_steps):
+		if _is_orthogonal_adjacent(monster.grid_pos, player.grid_pos):
+			msgs.append(Combat.resolve_attack(monster, player))
+			break
 		var delta := player.grid_pos - monster.grid_pos
 		var dir := _choose_direction(monster, delta, map, monster.phases_walls)
 		if dir == Vector2i.ZERO:
@@ -55,8 +56,6 @@ static func _take_multi_step_turn(monster: Entity, player: Entity, map: DungeonM
 		var step_msg := Movement.try_move(monster, dir, map, entities)
 		if step_msg != "":
 			msgs.append(step_msg)
-			break
-		if _is_orthogonal_adjacent(monster.grid_pos, player.grid_pos):
 			break
 	return " ".join(msgs)
 
