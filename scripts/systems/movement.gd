@@ -4,9 +4,14 @@ extends RefCounted
 ## Attempts to step one tile in dir. If the tile is occupied, attacks instead of
 ## moving. Otherwise moves, then resolves trap damage and, for reach weapons
 ## (e.g. Spear), a free follow-up attack on any now-adjacent hostile.
+## Entities with phases_walls (e.g. Ghost) ignore wall/door blocking entirely,
+## only bounded by the map edges.
 static func try_move(entity: Entity, dir: Vector2i, map: DungeonMap, entities: Array) -> String:
 	var target := entity.grid_pos + dir
-	if not map.is_walkable(target):
+	if entity.phases_walls:
+		if not map.is_in_bounds(target):
+			return ""
+	elif not map.is_walkable(target):
 		return ""
 	for other in entities:
 		if other == entity or other.hp <= 0:
@@ -16,7 +21,10 @@ static func try_move(entity: Entity, dir: Vector2i, map: DungeonMap, entities: A
 	entity.grid_pos = target
 
 	var msg := ""
-	if map.get_tile(target) == Tile.Type.TRAP and not entity.trap_immune:
+	var target_tile := map.get_tile(target)
+	if (target_tile == Tile.Type.TRAP or target_tile == Tile.Type.HIDDEN_TRAP) and not entity.trap_immune:
+		# Stepping directly onto a hidden trap springs and reveals it, same as a visible one.
+		map.set_tile(target, Tile.Type.TRAP)
 		msg = _trigger_trap(entity)
 
 	if entity.hp > 0 and entity.weapon != null and entity.weapon.get("reach", false):

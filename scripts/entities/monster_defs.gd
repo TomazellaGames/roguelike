@@ -50,7 +50,24 @@ const OGRE := {
 	"half_speed": true,
 }
 
-const ALL := [RAT, GOBLIN, SPIDER, OGRE]
+const GHOST := {
+	"name": "ghost",
+	"glyph": "G",
+	"color": Color(0.85, 0.85, 1.0, 0.55),
+	"hp": 1,
+	"atk": 1,
+	"defense": 0,
+	"sight_radius": 4,
+	"gold_min": 0,
+	"gold_max": 0,
+	"min_level": 14,
+	"trap_immune": true,
+	"phases_walls": true,
+	"move_steps": 2,
+	"dodge_chance": 0.5,
+}
+
+const ALL := [RAT, GOBLIN, SPIDER, OGRE, GHOST]
 
 static func average_gold() -> float:
 	var total := 0.0

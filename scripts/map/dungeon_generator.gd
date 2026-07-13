@@ -28,6 +28,22 @@ static func generate(map: DungeonMap, room_count: int, min_size: int, max_size: 
 		rooms.append(room)
 	return rooms
 
+## Finds every FLOOR tile just outside room that's orthogonally adjacent to it —
+## i.e. the corridor tiles where the room connects to the rest of the dungeon.
+static func find_room_exits(map: DungeonMap, room: Rect2i) -> Array:
+	var exits := {}
+	var dirs: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
+	for x in range(room.position.x, room.position.x + room.size.x):
+		for y in range(room.position.y, room.position.y + room.size.y):
+			var pos := Vector2i(x, y)
+			for dir in dirs:
+				var neighbor: Vector2i = pos + dir
+				if room.has_point(neighbor):
+					continue
+				if map.get_tile(neighbor) == Tile.Type.FLOOR:
+					exits[neighbor] = true
+	return exits.keys()
+
 static func _carve_room(map: DungeonMap, room: Rect2i) -> void:
 	for y in range(room.position.y, room.position.y + room.size.y):
 		for x in range(room.position.x, room.position.x + room.size.x):

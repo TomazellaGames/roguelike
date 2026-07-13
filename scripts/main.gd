@@ -7,12 +7,32 @@ const ROOM_MIN_SIZE := 4
 const ROOM_MAX_SIZE := 9
 
 const HEAL_ITEM_INTERVAL := 4
+const WHEEL_OF_FORTUNE_INTERVAL := 7
 const TOLL_INTERVAL := 10
 const TOLL_WINDOW_LEVELS := 10
 const TOLL_FRACTION := 0.15
 const MAX_TRAPS_PER_LEVEL := 3
 const HOLD_THRESHOLD_MSEC := 1500
 const BLINK_DURATION_MSEC := 120
+
+const DOOR_MIN_LEVEL := 11
+const HIDDEN_TRAP_MIN_LEVEL := 11
+const HIDDEN_TRAP_REVEAL_DISTANCE := 2
+
+const WHEEL_OUTCOMES := [
+	{"chance": 1, "id": "die"},
+	{"chance": 1, "id": "lose_upgrade"},
+	{"chance": 14, "id": "lose_half_hp"},
+	{"chance": 14, "id": "lose_gear"},
+	{"chance": 10, "id": "spawn_here"},
+	{"chance": 10, "id": "spawn_elsewhere"},
+	{"chance": 10, "id": "heal_full"},
+	{"chance": 10, "id": "kill_random_monster"},
+	{"chance": 14, "id": "heal_half_hp"},
+	{"chance": 14, "id": "gear_upgrade"},
+	{"chance": 1, "id": "gain_upgrade"},
+	{"chance": 1, "id": "kill_room_monsters"},
+]
 
 @onready var ascii_renderer: AsciiRenderer = $AsciiRenderer
 @onready var hud: Hud = $HUDLayer/HUD
@@ -29,6 +49,10 @@ var level := 1
 var max_level_reached := 1
 var _key_press_time: Dictionary = {}
 var _blink_end_msec: int = -1
+
+var doors_open := false
+var switch_pos: Vector2i = Vector2i(-1, -1)
+var hidden_trap_pos: Vector2i = Vector2i(-1, -1)
 
 func _ready() -> void:
 	hud.move_pressed.connect(_on_hud_move_pressed)
@@ -74,7 +98,9 @@ func _start_level() -> void:
 	player.grid_pos = rooms[0].get_center()
 	entities = [player]
 	_place_stairs()
+	_place_doors_and_switch()
 	_place_traps()
+	_place_hidden_trap()
 	_spawn_monsters()
 	_spawn_items()
 	_heal_on_level_start()
@@ -103,9 +129,10 @@ func _spawn_monsters() -> void:
 	for i in range(1, rooms.size()):
 		var def := _pick_monster_def(spider_spawned, ogre_spawned)
 		var m := Entity.new_monster(rooms[i].get_center(), def)
-		m.hp += hp_bonus
-		m.max_hp += hp_bonus
-		m.atk += atk_bonus
+		if def["name"] != "ghost":
+			m.hp += hp_bonus
+			m.max_hp += hp_bonus
+			m.atk += atk_bonus
 		match def["name"]:
 			"spider":
 				m.home_room = rooms[i]
@@ -178,6 +205,9 @@ func _spawn_items() -> void:
 	if level % HEAL_ITEM_INTERVAL == 0 and candidate_rooms.size() > next_room:
 		item_pickups.append(_make_pickup(candidate_rooms[next_room], "heal", ItemDefs.HEAL_POTION))
 		next_room += 1
+	if level % WHEEL_OF_FORTUNE_INTERVAL == 0 and candidate_rooms.size() > next_room:
+		item_pickups.append(_make_pickup(candidate_rooms[next_room], "wheel", ItemDefs.WHEEL_OF_FORTUNE))
+		next_room += 1
 	if candidate_rooms.size() > next_room:
 		var weapon_def: Dictionary = ItemDefs.WEAPONS[randi() % ItemDefs.WEAPONS.size()].duplicate()
 		weapon_def["atk_bonus"] += level_bonus
@@ -199,6 +229,61 @@ func _make_pickup(room: Rect2i, slot: String, item_def: Dictionary) -> ItemPicku
 func _place_stairs() -> void:
 	stairs_pos = rooms[rooms.size() - 1].get_center()
 	dungeon_map.set_tile(stairs_pos, Tile.Type.STAIRS_DOWN)
+
+## From DOOR_MIN_LEVEL on, seals every corridor connecting the stairs room with
+## doors, and hides a switch in another (non-start, non-stairs) room that opens
+## them. Falls back to leaving the doors open if no valid switch room exists,
+## so the player is never locked out.
+func _place_doors_and_switch() -> void:
+	doors_open = false
+	switch_pos = Vector2i(-1, -1)
+	if level < DOOR_MIN_LEVEL:
+		return
+	var stairs_room: Rect2i = rooms[rooms.size() - 1]
+	for pos in DungeonGenerator.find_room_exits(dungeon_map, stairs_room):
+		dungeon_map.set_tile(pos, Tile.Type.DOOR)
+	var candidate_rooms := _non_special_rooms()
+	if candidate_rooms.is_empty():
+		doors_open = true
+		dungeon_map.open_doors()
+		return
+	candidate_rooms.shuffle()
+	switch_pos = _random_trap_position(candidate_rooms[0])
+	dungeon_map.set_tile(switch_pos, Tile.Type.SWITCH)
+
+## From HIDDEN_TRAP_MIN_LEVEL on, hides exactly one extra trap per floor that
+## only becomes visible once the player gets close to it.
+func _place_hidden_trap() -> void:
+	hidden_trap_pos = Vector2i(-1, -1)
+	if level < HIDDEN_TRAP_MIN_LEVEL:
+		return
+	var candidate_rooms := _non_special_rooms()
+	if candidate_rooms.is_empty():
+		return
+	candidate_rooms.shuffle()
+	hidden_trap_pos = _random_trap_position(candidate_rooms[0])
+	dungeon_map.set_tile(hidden_trap_pos, Tile.Type.HIDDEN_TRAP)
+
+func _check_switch() -> void:
+	if doors_open or switch_pos.x < 0:
+		return
+	if dungeon_map.get_tile(player.grid_pos) != Tile.Type.SWITCH:
+		return
+	doors_open = true
+	dungeon_map.open_doors()
+	hud.add_message("You trigger the switch. Somewhere on this floor, doors grind open.")
+
+## Reveals the hidden trap (turning it into a normal, visible TRAP tile) once the
+## player comes within HIDDEN_TRAP_REVEAL_DISTANCE tiles of it (taxicab distance,
+## which naturally covers "2 tiles orthogonally" and "1 tile diagonally").
+func _check_hidden_trap_reveal() -> void:
+	if hidden_trap_pos.x < 0:
+		return
+	if dungeon_map.get_tile(hidden_trap_pos) != Tile.Type.HIDDEN_TRAP:
+		return
+	var dist: int = absi(player.grid_pos.x - hidden_trap_pos.x) + absi(player.grid_pos.y - hidden_trap_pos.y)
+	if dist <= HIDDEN_TRAP_REVEAL_DISTANCE:
+		dungeon_map.set_tile(hidden_trap_pos, Tile.Type.TRAP)
 
 func _setup_turn_manager() -> void:
 	turn_manager = TurnManager.new()
@@ -297,6 +382,9 @@ func _perform_move(dir: Vector2i, double_step: bool) -> void:
 	turn_manager.process_player_turn(dir, double_step)
 	if not game_over:
 		_check_item_pickup()
+	if not game_over:
+		_check_switch()
+		_check_hidden_trap_reveal()
 		_check_stairs()
 	hud.update_hp(player.hp, player.max_hp)
 	hud.update_gold(player.gold)
@@ -313,6 +401,8 @@ func _check_item_pickup() -> void:
 		elif pickup.slot == "armor":
 			player.equip_armor(pickup.item_def)
 			hud.add_message("You wear %s." % pickup.item_def["name"])
+		elif pickup.slot == "wheel":
+			_spin_wheel_of_fortune()
 		else:
 			_get_heal_item()
 			var msg := "You drink the %s. Max HP is now %d. Offense is now %d. Defense is now %d." % [pickup.item_def["name"], player.max_hp, player.atk, player.defense]
@@ -332,6 +422,140 @@ func _get_heal_item() -> bool:
 	player.hp = player.max_hp
 	return player.heal_items_consumed % 3 == 0
 
+## Rolls a weighted outcome from WHEEL_OUTCOMES, applies its effect, and logs
+## only the outcome that hit along with its odds.
+func _spin_wheel_of_fortune() -> void:
+	var roll := randi_range(1, 100)
+	var cumulative := 0
+	var outcome: Dictionary = WHEEL_OUTCOMES[WHEEL_OUTCOMES.size() - 1]
+	for entry in WHEEL_OUTCOMES:
+		cumulative += entry["chance"]
+		if roll <= cumulative:
+			outcome = entry
+			break
+	var effect_msg := _apply_wheel_outcome(outcome["id"])
+	hud.add_message("The Wheel of Fortune spins... %s (%d%% chance)" % [effect_msg, outcome["chance"]])
+	if player.hp <= 0 and not game_over:
+		_on_player_died()
+
+func _apply_wheel_outcome(id: String) -> String:
+	match id:
+		"die":
+			player.hp = 0
+			return "You are struck down instantly!"
+		"lose_upgrade":
+			return _wheel_lose_upgrade()
+		"lose_half_hp":
+			var dmg := floori(player.max_hp / 2.0)
+			player.hp = max(0, player.hp - dmg)
+			return "You lose %d HP!" % dmg
+		"lose_gear":
+			player.unequip_weapon()
+			player.unequip_armor()
+			return "Your weapon and armor crumble to dust!"
+		"spawn_here":
+			return _wheel_spawn_monster(_room_containing(player.grid_pos))
+		"spawn_elsewhere":
+			return _wheel_spawn_monster(_random_room_other_than(player.grid_pos))
+		"heal_full":
+			player.hp = player.max_hp
+			return "You are fully healed!"
+		"kill_random_monster":
+			return _wheel_kill_random_monster()
+		"heal_half_hp":
+			var heal := floori(player.max_hp / 2.0)
+			player.hp = min(player.max_hp, player.hp + heal)
+			return "You recover %d HP!" % heal
+		"gear_upgrade":
+			return _wheel_gear_upgrade()
+		"gain_upgrade":
+			_get_heal_item()
+			return "You feel permanently stronger!"
+		"kill_room_monsters":
+			return _wheel_kill_room_monsters()
+	return ""
+
+func _wheel_lose_upgrade() -> String:
+	if player.heal_items_consumed <= 0:
+		return "...but you have no upgrades to lose."
+	player.heal_items_consumed -= 1
+	player.max_hp -= 3
+	player.base_atk -= 1
+	player.base_defense -= 1
+	player.crit_chance = max(0.0, player.crit_chance - 0.01)
+	player.recompute_stats()
+	player.hp = min(player.hp, player.max_hp)
+	return "You feel weaker. One of your upgrades fades away."
+
+func _wheel_gear_upgrade() -> String:
+	var level_bonus := floori((level - 1) / 2.0)
+	var spear: Dictionary = ItemDefs.WEAPONS[2].duplicate()
+	spear["atk_bonus"] += level_bonus
+	player.equip_weapon(spear)
+	var chainmail: Dictionary = ItemDefs.ARMOR[1].duplicate()
+	chainmail["def_bonus"] += level_bonus
+	player.equip_armor(chainmail)
+	return "You are gifted a Spear and Chainmail!"
+
+func _room_containing(pos: Vector2i) -> Rect2i:
+	for room in rooms:
+		if room.has_point(pos):
+			return room
+	return rooms[0]
+
+func _random_room_other_than(pos: Vector2i) -> Rect2i:
+	var current := _room_containing(pos)
+	var others: Array = rooms.filter(func(r): return r != current)
+	if others.is_empty():
+		return current
+	return others[randi() % others.size()]
+
+func _has_monster_named(monster_name: String) -> bool:
+	for e in turn_manager.entities:
+		if e != player and e.hp > 0 and e.display_name == monster_name:
+			return true
+	return false
+
+func _wheel_spawn_monster(room: Rect2i) -> String:
+	var def := _pick_monster_def(_has_monster_named("spider"), _has_monster_named("ogre"))
+	var m := Entity.new_monster(room.get_center(), def)
+	if def["name"] != "ghost":
+		m.hp += level - 1
+		m.max_hp += level - 1
+		m.atk += floori((level - 1) / 3.0)
+	if def["name"] == "spider":
+		m.home_room = room
+		m.restrict_to_room = true
+	turn_manager.entities.append(m)
+	return "A %s appears!" % def["name"]
+
+func _wheel_kill_random_monster() -> String:
+	var candidates: Array = []
+	for e in turn_manager.entities:
+		if e != player and e.hp > 0:
+			candidates.append(e)
+	if candidates.is_empty():
+		return "...but there are no monsters left to slay."
+	var target: Entity = candidates[randi() % candidates.size()]
+	var gold := randi_range(target.gold_min, target.gold_max)
+	target.hp = 0
+	player.gold += gold
+	return "A %s dies in a burst of light! You gain %d gold." % [target.display_name, gold]
+
+func _wheel_kill_room_monsters() -> String:
+	var room := _room_containing(player.grid_pos)
+	var total_gold := 0
+	var count := 0
+	for e in turn_manager.entities:
+		if e != player and e.hp > 0 and room.has_point(e.grid_pos):
+			total_gold += randi_range(e.gold_min, e.gold_max)
+			e.hp = 0
+			count += 1
+	if count == 0:
+		return "...but there are no monsters in this room."
+	player.gold += total_gold
+	return "Every monster in the room is annihilated! You gain %d gold." % total_gold
+
 func _check_stairs() -> void:
 	if dungeon_map.get_tile(player.grid_pos) != Tile.Type.STAIRS_DOWN:
 		return
@@ -344,7 +568,8 @@ func _check_stairs() -> void:
 			_on_toll_failed(fee)
 			return
 		player.gold -= fee
-		hud.add_message("You pay the toll of %d gold to proceed." % fee)
+		player.hp = player.max_hp
+		hud.add_message("You pay the toll of %d gold to proceed. The journey's toll fully restores you." % fee)
 	level = next_level
 	hud.add_message("You descend to floor %d." % level)
 	_start_level()

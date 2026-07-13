@@ -1,7 +1,8 @@
 class_name Combat
 extends RefCounted
 
-## Resolves one melee attack: rolls for a player crit, applies damage, wears down
+## Resolves one melee attack: rolls for a player crit, rolls for defender dodge
+## (skipped on a crit, which always connects), applies damage, wears down
 ## attacker/defender equipment (breaking and unequipping at 0 durability), and
 ## awards gold if the defender dies to the player. Returns a log message.
 static func resolve_attack(attacker: Entity, defender: Entity) -> String:
@@ -10,16 +11,24 @@ static func resolve_attack(attacker: Entity, defender: Entity) -> String:
 		var crit_mult: float = attacker.weapon["crit_mult"] if (attacker.weapon != null and attacker.weapon.has("crit_mult")) else 1.0
 		is_crit = randf() < attacker.crit_chance * crit_mult
 
+	var is_dodged := not is_crit and defender.dodge_chance > 0.0 and randf() < defender.dodge_chance
+
 	var dmg: int
-	if is_crit:
-		dmg = max(1, attacker.atk * 2)
+	var msg: String
+	if is_dodged:
+		dmg = 0
+		var miss_verb := "miss" if attacker.is_player else "misses"
+		msg = "%s %s %s completely!" % [attacker.display_name.capitalize(), miss_verb, defender.display_name]
 	else:
-		dmg = max(1, attacker.atk - defender.defense)
+		if is_crit:
+			dmg = max(1, attacker.atk * 2)
+		else:
+			dmg = max(1, attacker.atk - defender.defense)
+		var hit_verb := "hit" if attacker.is_player else "hits"
+		msg = "%s %s %s for %d damage." % [attacker.display_name.capitalize(), hit_verb, defender.display_name, dmg]
+		if is_crit:
+			msg += " Critical hit!"
 	defender.hp -= dmg
-	var hit_verb := "hit" if attacker.is_player else "hits"
-	var msg := "%s %s %s for %d damage." % [attacker.display_name.capitalize(), hit_verb, defender.display_name, dmg]
-	if is_crit:
-		msg += " Critical hit!"
 
 	if attacker.weapon != null:
 		attacker.weapon["durability"] -= 1

@@ -31,6 +31,10 @@ var half_speed: bool = false
 var resting: bool = false
 var blink_hidden: bool = false
 
+var move_steps: int = 1
+var phases_walls: bool = false
+var dodge_chance: float = 0.0
+
 static func new_player(pos: Vector2i) -> Entity:
 	var e := Entity.new()
 	e.grid_pos = pos
@@ -91,5 +95,8 @@ static func new_monster(pos: Vector2i, def: Dictionary) -> Entity:
 	e.gold_max = def.get("gold_max", 0)
 	e.trap_immune = def.get("trap_immune", false)
 	e.half_speed = def.get("half_speed", false)
+	e.move_steps = def.get("move_steps", 1)
+	e.phases_walls = def.get("phases_walls", false)
+	e.dodge_chance = def.get("dodge_chance", 0.0)
 	e.is_player = false
 	return e

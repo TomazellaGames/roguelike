@@ -20,3 +20,9 @@ const HEAL_POTION := {
 	"glyph": "+",
 	"color": Color(1.0, 0.3, 0.6),
 }
+
+const WHEEL_OF_FORTUNE := {
+	"name": "Wheel of Fortune",
+	"glyph": "%",
+	"color": Color(1.0, 1.0, 0.0),
+}
