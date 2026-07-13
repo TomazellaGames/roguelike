@@ -403,10 +403,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey):
 		return
 
-	# TODO remove this on builds
-	# Debug cheat codes: Shift/Ctrl/Alt + a key grants gear, gold, or heals for testing.
-	#_debug_codes(event)
-		
 	var dir := _keycode_to_direction(event.keycode)
 	if dir == Vector2i.ZERO:
 		return
@@ -711,77 +707,3 @@ func _keycode_to_direction(keycode: int) -> Vector2i:
 		KEY_RIGHT, KEY_KP_6, KEY_L, KEY_D:
 			return Vector2i(1, 0)
 	return Vector2i.ZERO
-
-func _debug_codes(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo:
-		var weapon_added
-		var armor_added
-		var has_changes: bool = false
-		if Input.is_key_pressed(KEY_SHIFT):
-			if event.keycode == KEY_APOSTROPHE:
-				player.unequip_weapon()
-				printerr("DEBUG: unequip weapon")
-				has_changes = true
-			elif event.keycode == KEY_1:
-				weapon_added = ItemDefs.WEAPONS[0].duplicate()
-				has_changes = true
-			elif event.keycode == KEY_2:
-				weapon_added = ItemDefs.WEAPONS[1].duplicate()
-				has_changes = true
-			elif event.keycode == KEY_3:
-				weapon_added = ItemDefs.WEAPONS[2].duplicate()
-				has_changes = true
-			elif event.keycode == KEY_4:
-				weapon_added = ItemDefs.WEAPONS[3].duplicate()
-				has_changes = true
-			elif event.keycode == KEY_5:
-				weapon_added = ItemDefs.WEAPONS[4].duplicate()
-				has_changes = true
-		elif Input.is_key_pressed(KEY_CTRL):
-			if event.keycode == KEY_APOSTROPHE:
-				player.unequip_armor()
-				printerr("DEBUG: unequip armor")
-				has_changes = true
-			elif event.keycode == KEY_1:
-				armor_added = ItemDefs.ARMOR[0].duplicate()
-				has_changes = true
-			elif event.keycode == KEY_2:
-				armor_added = ItemDefs.ARMOR[1].duplicate()
-				has_changes = true
-			elif event.keycode == KEY_3:
-				armor_added = ItemDefs.ARMOR[2].duplicate()
-				has_changes = true
-		elif Input.is_key_pressed(KEY_ALT):
-			if event.keycode == KEY_2:
-				_get_heal_item()
-				printerr("DEBUG: adding one Upgrade")
-				has_changes = true
-			elif event.keycode == KEY_1:
-				player.gold += 10
-				printerr("DEBUG: adding 10 gold")
-				has_changes = true
-			elif event.keycode == KEY_APOSTROPHE:
-				player.hp = player.max_hp
-				printerr("DEBUG: Full Heal")
-				has_changes = true
-			elif event.keycode == KEY_3:
-				printerr("DEBUG: Skip Floor")
-				level = level + 1
-				hud.add_message("DEBUG: You used a cheat code!")
-				hud.add_message("You descend to floor %d." % level)
-				_start_level()
-		if has_changes:
-			var level_bonus := floori((level - 1) / 2.0)
-			if weapon_added:
-				weapon_added["atk_bonus"] += level_bonus
-				player.equip_weapon(weapon_added)
-				printerr("DEBUG: equip weapon " + weapon_added.name)
-			if armor_added:
-				armor_added["def_bonus"] += level_bonus
-				player.equip_armor(armor_added)
-				printerr("DEBUG: equip armor " + armor_added.name)
-			hud.update_gear(player.atk, player.defense, player.weapon, player.armor)
-			hud.update_hp(player.hp, player.max_hp)
-			hud.update_gold(player.gold)
-			hud.add_message("DEBUG: You used a cheat code!")
-			_render()
