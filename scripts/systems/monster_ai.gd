@@ -1,6 +1,9 @@
 class_name MonsterAI
 extends RefCounted
 
+## Entry point for a monster's turn: does nothing if the player is out of
+## sight, then dispatches to the half-speed (Ogre) or multi-step (Ghost)
+## variant if applicable, otherwise attacks if adjacent or takes one step.
 static func take_turn(monster: Entity, player: Entity, map: DungeonMap, entities: Array) -> String:
 	var dist := _chebyshev_distance(monster.grid_pos, player.grid_pos)
 	if dist > monster.sight_radius:

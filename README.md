@@ -1,8 +1,19 @@
 # Roguelike
 
-A really Rogue-Like game — ASCII dungeon crawling built with [Godot 4.7](https://godotengine.org/).
+**v1.0.0** — A really Rogue-Like game — ASCII dungeon crawling built with [Godot 4.7](https://godotengine.org/).
 
-You descend one procedurally generated floor at a time, fighting monsters, grabbing gear and gold, and avoiding traps, until you either find the stairs or die trying.
+You descend one procedurally generated floor at a time, fighting monsters, grabbing gear and gold, and avoiding traps. Escape alive from floor 21 to win, and see how your run scores.
+
+## Gameplay
+
+- **The goal**: reach floor 21 and escape. Doing so ends the run with a victory screen and a score based on your remaining HP, gold collected, traps triggered, and pickups used.
+- **Combat**: move into a monster to attack it. Weapons and armor wear down with use and break; the player has a small chance to land a critical hit.
+- **Monsters**: rat and goblin throughout, spider from floor 6 (stays near its spawn room), ogre from floor 9 (attacks at half speed), and ghost from floor 15 (always 1 HP/1 atk, moves 2 tiles a turn, passes through walls and doors, immune to traps, and dodges half of all non-critical hits).
+- **Gear & potions**: weapon and armor pickups appear every floor; a Potion of Vitality (permanent +HP/attack/defense/crit) appears every 4th floor.
+- **Wheel of Fortune** (`%`): appears every 7th floor. Spinning it rolls one of twelve outcomes, from instant death or losing your gear to full heals, bonus monster kills, or a free upgrade.
+- **Traps** (`^`): scattered through most floors (up to 3). From floor 11 on, one extra hidden trap per floor stays invisible until you get close, or until you step on it.
+- **Doors & switch**: from floor 11 on, the stairs room is sealed behind doors; a hidden switch (`\`) elsewhere on the floor opens them.
+- **Toll**: every 10th floor charges a gold toll to proceed — paying it also fully heals you; failing to pay ends the run.
 
 ## Requirements
 
@@ -73,6 +84,7 @@ addons/funplay_mcp/  Editor plugin exposing an MCP server for AI-assisted editin
 - Move: Arrow keys, WASD, or vim keys (H/J/K/L)
 - Hold a direction key briefly before releasing to sprint two tiles at the cost of 1 HP
 - On-screen buttons are available for touch/mobile play
+- On death or victory: restart instantly, or share/download a screenshot of the result
 
 ## Credits
 

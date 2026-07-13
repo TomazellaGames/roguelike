@@ -137,6 +137,10 @@ func _generate_dungeon() -> void:
 	dungeon_map = DungeonMap.new(MAP_WIDTH, MAP_HEIGHT)
 	rooms = DungeonGenerator.generate(dungeon_map, ROOM_COUNT, ROOM_MIN_SIZE, ROOM_MAX_SIZE)
 
+## Spawns one monster per room (except the start room), scaled up with hp_bonus/
+## atk_bonus as the run gets deeper. Ghost is exempt from that scaling (it's
+## always a fixed 1 HP/1 atk glass cannon) and spider/ogre/ghost are each
+## capped at one live instance per floor via the spawned flags below.
 func _spawn_monsters() -> void:
 	var hp_bonus := level - 1
 	var atk_bonus := floori((level - 1) / 3.0)
@@ -161,6 +165,9 @@ func _spawn_monsters() -> void:
 				ghost_spawned = true
 		entities.append(m)
 
+## Picks a random monster def valid for the current level, excluding any of
+## spider/ogre/ghost that already have a live instance this floor (each capped
+## at one).
 func _pick_monster_def(spider_spawned: bool, ogre_spawned: bool, ghost_spawned: bool = false) -> Dictionary:
 	var candidates: Array = []
 	for def in MonsterDefs.ALL:
@@ -190,6 +197,9 @@ func _place_traps() -> void:
 		var pos := _random_trap_position(candidate_rooms[i])
 		dungeon_map.set_tile(pos, Tile.Type.TRAP)
 
+## Picks a random floor tile inside room, avoiding its center (reserved for a
+## spawned monster). Reused for traps, the door switch, and the hidden trap.
+## Falls back to the center if 20 random tries all land on it (tiny rooms).
 func _random_trap_position(room: Rect2i) -> Vector2i:
 	var inner := room.grow(-1)
 	var center := room.get_center()
@@ -310,6 +320,8 @@ func _place_hidden_trap() -> void:
 	hidden_trap_pos = _random_trap_position(candidate_rooms[0])
 	dungeon_map.set_tile(hidden_trap_pos, Tile.Type.HIDDEN_TRAP)
 
+## Opens the sealed stairs-room doors for the rest of the floor once the player
+## steps on the hidden switch, and clears the switch glyph so it doesn't linger.
 func _check_switch() -> void:
 	if doors_open or switch_pos.x < 0:
 		return
@@ -445,6 +457,8 @@ func _on_hud_download_pressed() -> void:
 	else:
 		hud.show_screenshot_status("Could not save screenshot.")
 
+## Reports whether key/dir was held past HOLD_THRESHOLD_MSEC (a sprint), and
+## clears the charging-blink state regardless, since the hold is now resolved.
 func _consume_hold(key) -> bool:
 	var held_msec := 0
 	if _key_press_time.has(key):
@@ -473,6 +487,8 @@ func _perform_move(dir: Vector2i, double_step: bool) -> void:
 	hud.update_gear(player.atk, player.defense, player.weapon, player.armor)
 	_render()
 
+## Resolves whatever pickup is sitting on the player's tile: equips gear,
+## spins the Wheel of Fortune, or drinks a potion — then removes the pickup.
 func _check_item_pickup() -> void:
 	for pickup in item_pickups.duplicate():
 		if pickup.grid_pos != player.grid_pos:
@@ -523,6 +539,8 @@ func _spin_wheel_of_fortune() -> void:
 	if player.hp <= 0 and not game_over:
 		_on_player_died()
 
+## Applies the effect for a rolled WHEEL_OUTCOMES id and returns its log line;
+## see _spin_wheel_of_fortune for how id is chosen.
 func _apply_wheel_outcome(id: String) -> String:
 	match id:
 		"die":
@@ -560,6 +578,8 @@ func _apply_wheel_outcome(id: String) -> String:
 			return _wheel_kill_room_monsters()
 	return ""
 
+## Exactly reverses one _get_heal_item() boost (the wheel's "bad" mirror of a
+## heal potion); does nothing if the player hasn't collected any yet.
 func _wheel_lose_upgrade() -> String:
 	if player.heal_items_consumed <= 0:
 		return "...but you have no upgrades to lose."
@@ -602,6 +622,9 @@ func _has_monster_named(monster_name: String) -> bool:
 			return true
 	return false
 
+## Spawns one extra monster mid-floor, mirroring _spawn_monsters' level-scaling
+## and one-per-floor rules for spider/ogre/ghost (checked against live entities
+## instead of this level's spawn flags, since it happens after the initial spawn).
 func _wheel_spawn_monster(room: Rect2i) -> String:
 	var def := _pick_monster_def(_has_monster_named("spider"), _has_monster_named("ogre"), _has_monster_named("ghost"))
 	var m := Entity.new_monster(room.get_center(), def)
@@ -649,6 +672,7 @@ func _check_stairs() -> void:
 		return
 	var next_level := level + 1
 	if next_level == GOAL_LEVEL:
+		# Reaching the goal floor ends the run in victory instead of generating it.
 		level = next_level
 		if level > max_level_reached:
 			max_level_reached = level
