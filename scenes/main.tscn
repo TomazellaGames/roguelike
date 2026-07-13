@@ -33,10 +33,16 @@ offset_top = 10.0
 offset_right = 1269.0
 offset_bottom = 710.0
 
+[node name="GoalLabel" type="Label" parent="HUDLayer/HUD/Sidebar" unique_id=945848693]
+modulate = Color(0.74978, 0.74978, 0.74977994, 1)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "Escape the Dungeon!"
+
 [node name="LevelLabel" type="Label" parent="HUDLayer/HUD/Sidebar" unique_id=770217537]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-text = "Level: 1"
+text = "Floor: 1"
 
 [node name="HPLabel" type="Label" parent="HUDLayer/HUD/Sidebar" unique_id=578096945]
 layout_mode = 2
